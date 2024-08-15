@@ -6,10 +6,10 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 from torch.distributions.normal import Normal
-
+from typing import List, Union, Tuple
 
 class ActorPPO(nn.Module):
-    def __init__(self, dims: [int], state_dim: int, action_dim: int):
+    def __init__(self, dims: List[int], state_dim: int, action_dim: int):
         super().__init__()
         self.net = build_mlp(dims=[state_dim, *dims, action_dim])
         self.action_std_log = nn.Parameter(torch.zeros((1, action_dim)), requires_grad=True)  # trainable parameter
@@ -17,7 +17,7 @@ class ActorPPO(nn.Module):
     def forward(self, state: Tensor) -> Tensor:
         return self.net(state).tanh()  # action.tanh()
 
-    def get_action(self, state: Tensor) -> (Tensor, Tensor):  # for exploration
+    def get_action(self, state: Tensor) -> Tuple[Tensor, Tensor]:  # for exploration
         action_avg = self.net(state)
         action_std = self.action_std_log.exp()
 
@@ -26,7 +26,7 @@ class ActorPPO(nn.Module):
         logprob = dist.log_prob(action).sum(1)
         return action, logprob
 
-    def get_logprob_entropy(self, state: Tensor, action: Tensor) -> (Tensor, Tensor):
+    def get_logprob_entropy(self, state: Tensor, action: Tensor) -> Tuple[Tensor, Tensor]:
         action_avg = self.net(state)
         action_std = self.action_std_log.exp()
 
@@ -41,7 +41,7 @@ class ActorPPO(nn.Module):
 
 
 class CriticPPO(nn.Module):
-    def __init__(self, dims: [int], state_dim: int, _action_dim: int):
+    def __init__(self, dims: List[int], state_dim: int, _action_dim: int):
         super().__init__()
         self.net = build_mlp(dims=[state_dim, *dims, 1])
 
@@ -49,7 +49,7 @@ class CriticPPO(nn.Module):
         return self.net(state)  # advantage value
 
 
-def build_mlp(dims: [int]) -> nn.Sequential:  # MLP (MultiLayer Perceptron)
+def build_mlp(dims: List[int]) -> nn.Sequential:  # MLP (MultiLayer Perceptron)
     net_list = []
     for i in range(len(dims) - 1):
         net_list.extend([nn.Linear(dims[i], dims[i + 1]), nn.ReLU()])
@@ -172,7 +172,7 @@ def build_env(env_class=None, env_args=None):
 
 
 class AgentBase:
-    def __init__(self, net_dims: [int], state_dim: int, action_dim: int, gpu_id: int = 0, args: Config = Config()):
+    def __init__(self, net_dims: List[int], state_dim: int, action_dim: int, gpu_id: int = 0, args: Config = Config()):
         self.state_dim = state_dim
         self.action_dim = action_dim
 
@@ -213,7 +213,7 @@ class AgentBase:
 
 
 class AgentPPO(AgentBase):
-    def __init__(self, net_dims: [int], state_dim: int, action_dim: int, gpu_id: int = 0, args: Config = Config()):
+    def __init__(self, net_dims: List[int], state_dim: int, action_dim: int, gpu_id: int = 0, args: Config = Config()):
         self.if_off_policy = False
         self.act_class = getattr(self, "act_class", ActorPPO)
         self.cri_class = getattr(self, "cri_class", CriticPPO)
@@ -224,7 +224,7 @@ class AgentPPO(AgentBase):
         self.lambda_entropy = getattr(args, "lambda_entropy", 0.01)  # could be 0.00~0.10
         self.lambda_entropy = torch.tensor(self.lambda_entropy, dtype=torch.float32, device=self.device)
 
-    def explore_env(self, env, horizon_len: int) -> [Tensor]:
+    def explore_env(self, env, horizon_len: int) -> List[Tensor]:
         states = torch.zeros((horizon_len, self.state_dim), dtype=torch.float32).to(self.device)
         actions = torch.zeros((horizon_len, self.action_dim), dtype=torch.float32).to(self.device)
         logprobs = torch.zeros(horizon_len, dtype=torch.float32).to(self.device)
@@ -255,7 +255,7 @@ class AgentPPO(AgentBase):
         undones = (1 - dones.type(torch.float32)).unsqueeze(1)
         return states, actions, logprobs, rewards, undones
 
-    def update_net(self, buffer) -> [float]:
+    def update_net(self, buffer) -> List[float]:
         with torch.no_grad():
             states, actions, logprobs, rewards, undones = buffer
             buffer_size = states.shape[0]
@@ -337,7 +337,7 @@ class PendulumEnv(gym.Wrapper):  # a demo of custom gym env
     def reset(self) -> np.ndarray:  # reset the agent in env
         return self.env.reset()
 
-    def step(self, action: np.ndarray) -> (np.ndarray, float, bool, dict):  # agent interacts in env
+    def step(self, action: np.ndarray) -> Union[np.ndarray, float, bool, dict]:  # agent interacts in env
         # OpenAI Pendulum env set its action space as (-2, +2). It is bad.
         # We suggest that adjust action space to (-1, +1) when designing a custom env.
         state, reward, done, info_dict = self.env.step(action * 2)
@@ -369,7 +369,7 @@ def train_agent(args: Config):
             break  # stop training when reach `break_step` or `mkdir cwd/stop`
 
 
-def render_agent(env_class, env_args: dict, net_dims: [int], agent_class, actor_path: str, render_times: int = 8):
+def render_agent(env_class, env_args: dict, net_dims: List[int], agent_class, actor_path: str, render_times: int = 8):
     env = build_env(env_class, env_args)
 
     state_dim = env_args['state_dim']
@@ -424,7 +424,7 @@ class Evaluator:
               f"| {logging_tuple[0]:8.2f}  {logging_tuple[1]:8.2f}")
 
 
-def get_rewards_and_steps(env, actor, if_render: bool = False) -> (float, int):  # cumulative_rewards and episode_steps
+def get_rewards_and_steps(env, actor, if_render: bool = False) -> Union[float, int]:  # cumulative_rewards and episode_steps
     device = next(actor.parameters()).device  # net.parameters() is a Python generator.
 
     state = env.reset()

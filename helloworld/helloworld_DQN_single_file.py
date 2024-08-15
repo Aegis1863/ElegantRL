@@ -6,7 +6,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch import Tensor
-
+from typing import Tuple, Union, List
 
 class Config:  # for off-policy
     def __init__(self, agent_class=None, env_class=None, env_args=None):
@@ -55,7 +55,7 @@ class Config:  # for off-policy
 
 
 class QNet(nn.Module):  # `nn.Module` is a PyTorch module for neural network
-    def __init__(self, dims: [int], state_dim: int, action_dim: int):
+    def __init__(self, dims: List[int], state_dim: int, action_dim: int):
         super().__init__()
         self.net = build_mlp(dims=[state_dim, *dims, action_dim])
         self.explore_rate = None
@@ -72,7 +72,7 @@ class QNet(nn.Module):  # `nn.Module` is a PyTorch module for neural network
         return action
 
 
-def build_mlp(dims: [int]) -> nn.Sequential:  # MLP (MultiLayer Perceptron)
+def build_mlp(dims: List[int]) -> nn.Sequential:  # MLP (MultiLayer Perceptron)
     net_list = []
     for i in range(len(dims) - 1):
         net_list.extend([nn.Linear(dims[i], dims[i + 1]), nn.ReLU()])
@@ -98,6 +98,7 @@ def get_gym_env_args(env, if_print: bool) -> dict:
 
 
 def kwargs_filter(function, kwargs: dict) -> dict:
+    '''筛选fuction和kwargs中的相同参数并取出'''
     import inspect
     sign = inspect.signature(function).parameters.values()
     sign = {val.name for val in sign}
@@ -106,18 +107,18 @@ def kwargs_filter(function, kwargs: dict) -> dict:
 
 
 def build_env(env_class=None, env_args=None):
-    if env_class.__module__ == 'gym.envs.registration':  # special rule
-        assert '0.18.0' <= gym.__version__ <= '0.25.2'  # pip3 install gym==0.24.0
+    if env_class.__module__ == 'gymnasium.envs.registration':  # special rule
+        assert '0.18.0' <= gym.__version__  # pip3 install gymnasium, 版本限制与最新版gymnasium已冲突
         env = env_class(id=env_args['env_name'])
     else:
-        env = env_class(**kwargs_filter(env_class.__init__, env_args.copy()))
+        env = env_class(**kwargs_filter(env_class, env_args.copy()))
     for attr_str in ('env_name', 'state_dim', 'action_dim', 'if_discrete'):
         setattr(env, attr_str, env_args[attr_str])
     return env
 
 
 class AgentBase:
-    def __init__(self, net_dims: [int], state_dim: int, action_dim: int, gpu_id: int = 0, args: Config = Config()):
+    def __init__(self, net_dims: List[int], state_dim: int, action_dim: int, gpu_id: int = 0, args: Config = Config()):
         self.state_dim = state_dim
         self.action_dim = action_dim
 
@@ -158,7 +159,7 @@ class AgentBase:
 
 
 class AgentDQN(AgentBase):
-    def __init__(self, net_dims: [int], state_dim: int, action_dim: int, gpu_id: int = 0, args: Config = Config()):
+    def __init__(self, net_dims: List[int], state_dim: int, action_dim: int, gpu_id: int = 0, args: Config = Config()):
         self.act_class = getattr(self, "act_class", QNet)
         self.cri_class = getattr(self, "cri_class", None)  # means `self.cri = self.act`
         AgentBase.__init__(self, net_dims, state_dim, action_dim, gpu_id, args)
@@ -167,7 +168,7 @@ class AgentDQN(AgentBase):
         self.act.explore_rate = getattr(args, "explore_rate", 0.25)  # set for `self.act.get_action()`
         # the probability of choosing action randomly in epsilon-greedy
 
-    def explore_env(self, env, horizon_len: int, if_random: bool = False) -> [Tensor]:
+    def explore_env(self, env, horizon_len: int, if_random: bool = False) -> List[Tensor]:
         states = torch.zeros((horizon_len, self.state_dim), dtype=torch.float32).to(self.device)
         actions = torch.zeros((horizon_len, 1), dtype=torch.int32).to(self.device)
         rewards = torch.ones(horizon_len, dtype=torch.float32).to(self.device)
@@ -184,9 +185,9 @@ class AgentDQN(AgentBase):
                 action = get_action(state.unsqueeze(0))[0, 0]
 
             ary_action = action.detach().cpu().numpy()
-            ary_state, reward, done, _ = env.step(ary_action)
+            ary_state, reward, done, _, _ = env.step(ary_action)
             if done:
-                ary_state = env.reset()
+                ary_state, _ = env.reset()
 
             states[i] = state
             actions[i] = action
@@ -198,7 +199,7 @@ class AgentDQN(AgentBase):
         undones = (1.0 - dones.type(torch.float32)).unsqueeze(1)
         return states, actions, rewards, undones
 
-    def update_net(self, buffer) -> [float]:
+    def update_net(self, buffer) -> List[float]:
         obj_critics = 0.0
         q_values = 0.0
 
@@ -213,7 +214,7 @@ class AgentDQN(AgentBase):
             q_values += q_value.item()
         return obj_critics / update_times, q_values / update_times
 
-    def get_obj_critic(self, buffer, batch_size: int) -> (Tensor, Tensor):
+    def get_obj_critic(self, buffer, batch_size: int) -> Tuple[Tensor, Tensor]:
         with torch.no_grad():
             state, action, reward, undone, next_state = buffer.sample(batch_size)
             next_q = self.cri_target(next_state).max(dim=1, keepdim=True)[0]
@@ -236,7 +237,7 @@ class ReplayBuffer:  # for off-policy
         self.rewards = torch.empty((max_size, 1), dtype=torch.float32, device=self.device)
         self.undones = torch.empty((max_size, 1), dtype=torch.float32, device=self.device)
 
-    def update(self, items: [Tensor]):
+    def update(self, items: List[Tensor]):
         states, actions, rewards, undones = items
         p = self.p + rewards.shape[0]  # pointer
         if p > self.max_size:
@@ -258,7 +259,7 @@ class ReplayBuffer:  # for off-policy
         self.p = p
         self.cur_size = self.max_size if self.if_full else self.p
 
-    def sample(self, batch_size: int) -> [Tensor]:
+    def sample(self, batch_size: int) -> List[Tensor]:
         ids = torch.randint(self.cur_size - 1, size=(batch_size,), requires_grad=False)
         return self.states[ids], self.actions[ids], self.rewards[ids], self.undones[ids], self.states[ids + 1]
 
@@ -268,7 +269,7 @@ def train_agent(args: Config):
 
     env = build_env(args.env_class, args.env_args)
     agent = args.agent_class(args.net_dims, args.state_dim, args.action_dim, gpu_id=0, args=args)
-    agent.last_state = env.reset()
+    agent.last_state, _ = env.reset()
     buffer = ReplayBuffer(gpu_id=0, max_size=args.buffer_size,
                           state_dim=args.state_dim, action_dim=1 if args.if_discrete else args.action_dim, )
     buffer_items = agent.explore_env(env, args.horizon_len * args.eval_times, if_random=True)
@@ -330,16 +331,16 @@ class Evaluator:
               f"| {logging_tuple[0]:8.2f}  {logging_tuple[1]:8.2f}")
 
 
-def get_rewards_and_steps(env, actor, if_render: bool = False) -> (float, int):  # cumulative_rewards and episode_steps
+def get_rewards_and_steps(env, actor, if_render: bool = False) -> Tuple[float, int]:  # cumulative_rewards and episode_steps
     device = next(actor.parameters()).device  # net.parameters() is a Python generator.
-    state = env.reset()
+    state, _ = env.reset()
     episode_steps = 0
     cumulative_returns = 0.0  # sum of rewards in an episode
     for episode_steps in range(12345):
         tensor_state = torch.as_tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
         tensor_action = actor(tensor_state).argmax(dim=1)
         action = tensor_action.detach().cpu().numpy()[0]  # not need detach(), because using torch.no_grad() outside
-        state, reward, done, _ = env.step(action)
+        state, reward, done, _, _ = env.step(action)
         cumulative_returns += reward
 
         if if_render:
@@ -351,13 +352,15 @@ def get_rewards_and_steps(env, actor, if_render: bool = False) -> (float, int): 
 
 def train_dqn_for_cartpole():
     env_args = {
-        'env_name': 'CartPole-v0',  # A pole is attached by an un-actuated joint to a cart.
+        # 'id': 'CartPole-v1',  # 无须id参数 <- 考察109行
+        'env_name': 'CartPole-v1',  # A pole is attached by an un-actuated joint to a cart.
         'state_dim': 4,  # (CartPosition, CartVelocity, PoleAngle, PoleAngleVelocity)
         'action_dim': 2,  # (Push cart to the left, Push cart to the right)
         'if_discrete': True,  # discrete action space
-    }  # env_args = get_gym_env_args(env=gym.make('CartPole-v0'), if_print=True)
+    }
+    # env_args = get_gym_env_args(env=gym.make('CartPole-v0'), if_print=True)
 
-    args = Config(agent_class=AgentDQN, env_class=gym.make, env_args=env_args)  # see `Config` for explanation
+    args = Config(agent_class=AgentDQN, env_class=gym.make, env_args=env_args)  # env_class 其实应该改成 env_function
     args.break_step = int(2e5)  # break training if 'total_step > break_step'
     args.net_dims = (64, 32)  # the middle layer dimension of MultiLayer Perceptron
     args.gamma = 0.95  # discount factor of future rewards

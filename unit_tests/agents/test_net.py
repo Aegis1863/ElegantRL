@@ -213,7 +213,7 @@ def check_critic(state_dim=4, action_dim=2, batch_size=3, net_dims=(64, 32), gpu
     assert value.shape == (batch_size,)
 
 
-def check_build_mlp(net_dims: [int] = (64, 32)):
+def check_build_mlp(net_dims: List[int] = (64, 32)):
     print("\n| check_build_mlp()")
     from elegantrl.agents.net import build_mlp
 
