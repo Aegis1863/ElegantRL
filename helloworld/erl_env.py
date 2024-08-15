@@ -1,7 +1,7 @@
 from typing import Tuple
 
 import numpy as np
-import gymnasium as gymnasium as gym
+import gymnasium as gym
 
 ARY = np.ndarray
 

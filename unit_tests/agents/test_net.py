@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from torch import Tensor
-
+from typing import List
 
 def check_net_base(state_dim=4, action_dim=2, batch_size=3, gpu_id=0):
     print("\n| check_net_base()")
