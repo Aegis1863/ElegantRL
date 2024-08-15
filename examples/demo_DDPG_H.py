@@ -1,5 +1,5 @@
 import sys
-import gym
+import gymnasium as gym
 
 from elegantrl.train.run import train_and_evaluate, train_and_evaluate_mp
 from elegantrl.train.config import Arguments
@@ -57,7 +57,7 @@ def demo_ddpg_h_term(gpu_id, drl_id, env_id):
         args.break_step = int(2e6)
     
     elif env_name == 'Swimmer-v3':
-        from rl.envs.CustomGymEnv import GymNormaEnv
+        from rl.envs.CustomGymEnv import gymnasium as gymNormaEnv
         env_func = GymNormaEnv 
         env_args = {
             'action_dim': 2,

@@ -1,6 +1,6 @@
 import os
 import sys
-import gymnasium as gym
+import gymnasium as gymnasium as gym
 
 from erl_config import Config, get_gym_env_args
 from erl_agent import AgentDQN

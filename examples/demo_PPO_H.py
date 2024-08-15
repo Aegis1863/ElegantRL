@@ -1,10 +1,10 @@
 import sys
-import gym
+import gymnasium as gym
 
 from elegantrl.train.run import train_and_evaluate, train_and_evaluate_mp
 from elegantrl.train.config import Arguments
 from elegantrl.agents.AgentPPO import AgentPPO, AgentPPOHterm
-from elegantrl.envs.CustomGymEnv import GymNormaEnv
+from elegantrl.envs.CustomGymEnv import gymnasium as gymNormaEnv
 
 
 

@@ -1,6 +1,6 @@
 from elegantrl.train.evaluator import *
 from elegantrl.train.config import Arguments
-from elegantrl.envs.CustomGymEnv import GymNormaEnv
+from elegantrl.envs.CustomGymEnv import gymnasium as gymNormaEnv
 from elegantrl.agents.AgentPPO import AgentPPO, AgentPPOgetObjHterm
 from elegantrl.agents.AgentSAC import AgentSAC, AgentReSAC
 
@@ -91,7 +91,7 @@ def demo_evaluator_actor_pth():
         layer_num = 3
     elif env_name == 'Swimmer-v3':
         env_func = GymNormaEnv  # gym.make
-        # import gym
+        # import gymnasium as gym
         # env_func = gym.make
         env_args = {
             'action_dim': 2,

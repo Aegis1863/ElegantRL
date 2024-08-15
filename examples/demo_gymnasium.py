@@ -1,6 +1,6 @@
 import sys
 import torch as th
-import gymnasium as gym
+import gymnasium as gymnasium as gym
 from argparse import ArgumentParser
 
 sys.path.append("..")

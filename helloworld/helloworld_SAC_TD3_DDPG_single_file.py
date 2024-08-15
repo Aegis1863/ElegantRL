@@ -7,7 +7,7 @@ from typing import Tuple, List, Optional
 import numpy as np
 import torch as th
 import torch.nn as nn
-import gymnasium as gym
+import gymnasium as gymnasium as gym
 
 ARY = np.ndarray
 TEN = th.Tensor
