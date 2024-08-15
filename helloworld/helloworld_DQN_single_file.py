@@ -50,7 +50,7 @@ class Config:  # for off-policy
 
     def init_before_training(self):
         if self.cwd is None:  # set cwd (current working directory) for saving model
-            self.cwd = f'./{self.env_name}_{self.agent_class.__name__[5:]}'
+            self.cwd = f'./models/{self.env_name}_{self.agent_class.__name__[5:]}'
         os.makedirs(self.cwd, exist_ok=True)
 
 
