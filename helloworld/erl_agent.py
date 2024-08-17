@@ -93,8 +93,8 @@ class AgentBase:
         self.act_target = self.act
         self.cri_target = self.cri
 
-        self.act_optimizer: Optional[th.optim] = None
-        self.cri_optimizer: Optional[th.optim] = None
+        self.act_optimizer: Optional[th.optim.Optimizer] = None
+        self.cri_optimizer: Optional[th.optim.Optimizer] = None
         self.criterion = th.nn.SmoothL1Loss(reduction='none')
 
     def explore_env(self, env, horizon_len: int) -> Tuple[TEN, TEN, TEN, TEN, TEN]:
