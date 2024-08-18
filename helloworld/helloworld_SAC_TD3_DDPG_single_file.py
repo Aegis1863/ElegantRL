@@ -7,7 +7,7 @@ from typing import Tuple, List, Optional
 import numpy as np
 import torch as th
 import torch.nn as nn
-import gymnasium as gymnasium as gym
+import gymnasium as gym
 
 ARY = np.ndarray
 TEN = th.Tensor
@@ -150,7 +150,7 @@ class CriticBase(nn.Module):
 
 
 class Critic(CriticBase):
-    def __init__(self, net_dims: [int], state_dim: int, action_dim: int):
+    def __init__(self, net_dims: List[int], state_dim: int, action_dim: int):
         super().__init__(state_dim=state_dim, action_dim=action_dim)
         self.net = build_mlp(dims=[state_dim + action_dim, *net_dims, 1])
 
@@ -324,8 +324,8 @@ class AgentBase:
         self.act_target = self.act
         self.cri_target = self.cri
 
-        self.act_optimizer: Optional[th.optim] = None
-        self.cri_optimizer: Optional[th.optim] = None
+        self.act_optimizer: Optional[th.optim.Optimizer] = None
+        self.cri_optimizer: Optional[th.optim.Optimizer] = None
         self.criterion = th.nn.SmoothL1Loss()
 
     def get_random_action(self) -> TEN:
@@ -638,7 +638,7 @@ class Evaluator:
               f"| {logging_tuple[0]:8.2f}  {logging_tuple[1]:8.2f}")
 
 
-def get_rewards_and_steps(env, actor: ActorBase, if_render: bool = False) -> (float, int):
+def get_rewards_and_steps(env, actor: ActorBase, if_render: bool = False) -> Tuple[float, int]:
     device = next(actor.parameters()).device  # net.parameters() is a Python generator.
 
     state, info_dict = env.reset()

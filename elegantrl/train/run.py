@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+from typing import List
 import torch
 import numpy as np
 import torch.multiprocessing as mp  # torch.multiprocessing extends multiprocessing of Python
@@ -343,7 +344,7 @@ class EvaluatorProc(Process):
 '''render'''
 
 
-def render_agent(env_class, env_args: dict, net_dims: [int], agent_class, actor_path: str, render_times: int = 8):
+def render_agent(env_class, env_args: dict, net_dims: List[int], agent_class, actor_path: str, render_times: int = 8):
     env = build_env(env_class, env_args)
 
     state_dim = env_args['state_dim']
