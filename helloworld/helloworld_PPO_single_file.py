@@ -128,7 +128,7 @@ def get_gym_env_args(env, if_print: bool) -> dict:
             action_dim = env.action_space.n
         elif isinstance(env.action_space, gym.spaces.Box):  # make sure it is continuous action space
             action_dim = env.action_space.shape[0]
-            if any(env.action_space.high - 1):
+            if any(env.action_space.high - 1):  # 如果范围不是 [-1, 1] 就警告
                 print('WARNING: env.action_space.high', env.action_space.high)
             if any(env.action_space.low + 1):
                 print('WARNING: env.action_space.low', env.action_space.low)
@@ -162,7 +162,7 @@ def kwargs_filter(function, kwargs: dict) -> dict:
 
 def build_env(env_class=None, env_args=None):
     if env_class.__module__ == 'gym.envs.registration':  # special rule
-        assert '0.18.0' <= gym.__version__ <= '0.25.2'  # pip3 install gym==0.24.0
+        assert '0.18.0' <= gym.__version__  # pip3 install gymnasium
         env = env_class(id=env_args['env_name'])
     else:
         env = env_class(**kwargs_filter(env_class.__init__, env_args.copy()))
@@ -240,9 +240,9 @@ class AgentPPO(AgentBase):
             action, logprob = [t.squeeze(0) for t in get_action(state.unsqueeze(0))[:2]]
 
             ary_action = convert(action).detach().cpu().numpy()
-            ary_state, reward, done, _ = env.step(ary_action)
+            ary_state, reward, done, _, _ = env.step(ary_action)
             if done:
-                ary_state = env.reset()
+                ary_state, _ = env.reset()
 
             states[i] = state
             actions[i] = action
@@ -340,9 +340,9 @@ class PendulumEnv(gym.Wrapper):  # a demo of custom gym env
     def step(self, action: np.ndarray) -> Union[np.ndarray, float, bool, dict]:  # agent interacts in env
         # OpenAI Pendulum env set its action space as (-2, +2). It is bad.
         # We suggest that adjust action space to (-1, +1) when designing a custom env.
-        state, reward, done, info_dict = self.env.step(action * 2)
+        state, reward, done, truncated, info_dict = self.env.step(action * 2)
         state = state.reshape(self.state_dim)
-        return state, float(reward), done, info_dict
+        return state, float(reward), done, truncated, info_dict
 
 
 def train_agent(args: Config):
@@ -350,7 +350,7 @@ def train_agent(args: Config):
 
     env = build_env(args.env_class, args.env_args)
     agent = args.agent_class(args.net_dims, args.state_dim, args.action_dim, gpu_id=args.gpu_id, args=args)
-    agent.last_state = env.reset()
+    agent.last_state, _ = env.reset()
 
     evaluator = Evaluator(eval_env=build_env(args.env_class, args.env_args),
                           eval_per_step=args.eval_per_step,
@@ -402,7 +402,7 @@ class Evaluator:
               f"\n| `avgS`: Average of steps in an episode."
               f"\n| `objC`: Objective of Critic network. Or call it loss function of critic network."
               f"\n| `objA`: Objective of Actor network. It is the average Q value of the critic network."
-              f"\n| {'step':>8}  {'time':>8}  | {'avgR':>8}  {'stdR':>6}  {'avgS':>6}  | {'objC':>8}  {'objA':>8}")
+              f"\n| {'step':>8}  {'time':>8}  | {'avgR':>9}  {'stdR':>6}  {'avgS':>6}  | {'objC':>8}  {'objA':>8}")
 
     def evaluate_and_save(self, actor, horizon_len: int, logging_tuple: tuple):
         self.total_step += horizon_len
@@ -420,21 +420,21 @@ class Evaluator:
         self.recorder.append((self.total_step, used_time, avg_r))
 
         print(f"| {self.total_step:8.2e}  {used_time:8.0f}  "
-              f"| {avg_r:8.2f}  {std_r:6.2f}  {avg_s:6.0f}  "
+              f"| {avg_r:9.2f}  {std_r:6.2f}  {avg_s:6.0f}  "
               f"| {logging_tuple[0]:8.2f}  {logging_tuple[1]:8.2f}")
 
 
 def get_rewards_and_steps(env, actor, if_render: bool = False) -> Union[float, int]:  # cumulative_rewards and episode_steps
     device = next(actor.parameters()).device  # net.parameters() is a Python generator.
 
-    state = env.reset()
+    state, _ = env.reset()
     episode_steps = 0
     cumulative_returns = 0.0  # sum of rewards in an episode
     for episode_steps in range(12345):
         tensor_state = torch.as_tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
         tensor_action = actor(tensor_state)
         action = tensor_action.detach().cpu().numpy()[0]  # not need detach(), because using torch.no_grad() outside
-        state, reward, done, _ = env.step(action)
+        state, reward, done, _, _ = env.step(action)
         cumulative_returns += reward
 
         if if_render:
